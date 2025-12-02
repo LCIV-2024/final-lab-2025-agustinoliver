@@ -35,47 +35,75 @@ public class GameService {
     public GameResponseDTO startGame(Long playerId) {
         GameResponseDTO response = new GameResponseDTO();
         // TODO: Implementar el método startGame
+
         // Validar que el jugador existe
-       
-        // Verificar si ya existe una partida en curso para este jugador y palabra
-        
-        // Marcar la palabra como utilizada
-       
-        // Crear nueva partida en curso
-        
-        return response;
+        Player player = playerRepository.findById(playerId)
+                .orElseThrow(() -> new RuntimeException("Jugador no encontrado con id: " + playerId));
+
+        Word word = wordRepository.findRandomWord()
+                .orElseThrow(() -> new RuntimeException("No hay palabras disponibles para jugar."));
+
+        Optional<GameInProgress> existingGame = gameInProgressRepository.findByJugadorAndPalabra(playerId, word.getId());
+
+        if (existingGame.isPresent()) {
+            return buildResponseFromGameInProgress(existingGame.get());
+        }
+
+        word.setUtilizada(true);
+        wordRepository.save(word);
+
+        GameInProgress newGame = new GameInProgress();
+        newGame.setJugador(player);
+        newGame.setPalabra(word);
+        newGame.setLetrasIntentadas("");
+        newGame.setIntentosRestantes(MAX_INTENTOS);
+        newGame.setFechaInicio(LocalDateTime.now());
+
+        GameInProgress savedGame = gameInProgressRepository.save(newGame);
+
+        return buildResponseFromGameInProgress(savedGame);
     }
     
     @Transactional
     public GameResponseDTO makeGuess(Long playerId, Character letra) {
-        GameResponseDTO response = new GameResponseDTO();
         // TODO: Implementar el método makeGuess
-        // Validar que el jugador existe
+        Player player = playerRepository.findById(playerId)
+                .orElseThrow(() -> new RuntimeException("Jugador no encontrado con id: " + playerId));
 
-        // Convertir la letra a mayúscula
-        
-        // Buscar la partida en curso más reciente del jugador
-        
-        // Tomar la partida más reciente
-        
-        // Obtener letras ya intentadas
-        
-        // Verificar si la letra ya fue intentada
-        
-        // Agregar la nueva letra
-        
-        // Verificar si la letra está en la palabra
-        
-        // Decrementar intentos solo si la letra es incorrecta
-        
-        // Generar palabra oculta
-        
-        // Guardar el estado actualizado
-        
-        // Si el juego terminó, guardar en Game y eliminar de GameInProgress
-        
-        // Construir respuesta
-        
+        Character upperCaseLetra = Character.toUpperCase(letra);
+
+        List<GameInProgress> games = gameInProgressRepository.findByJugadorIdOrderByFechaInicioDesc(playerId);
+
+        if (games.isEmpty()) {
+            throw new RuntimeException("El jugador no tiene partidas en curso.");
+        }
+
+        GameInProgress gameInProgress = games.get(0);
+        Word word = gameInProgress.getPalabra();
+        String palabraOriginal = word.getPalabra().toUpperCase();
+
+        Set<Character> letrasSet = stringToCharSet(gameInProgress.getLetrasIntentadas());
+
+        if (letrasSet.contains(upperCaseLetra)) {
+            return buildResponseFromGameInProgress(gameInProgress);
+        }
+        letrasSet.add(upperCaseLetra);
+        gameInProgress.setLetrasIntentadas(charSetToString(letrasSet));
+        boolean acierto = palabraOriginal.indexOf(upperCaseLetra) >= 0;
+
+        if (!acierto) {
+            gameInProgress.setIntentosRestantes(gameInProgress.getIntentosRestantes() - 1);
+        }
+        gameInProgressRepository.save(gameInProgress);
+        GameResponseDTO response = buildResponseFromGameInProgress(gameInProgress);
+
+        boolean juegoTerminado = Boolean.TRUE.equals(response.getPalabraCompleta()) || response.getIntentosRestantes() <= 0;
+
+        if (juegoTerminado) {
+            saveGame(player, word, Boolean.TRUE.equals(response.getPalabraCompleta()), response.getPuntajeAcumulado());
+            gameInProgressRepository.delete(gameInProgress);
+        }
+
         return response;
     }
     
