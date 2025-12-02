@@ -68,7 +68,7 @@ class GameServiceTest {
         GameResponseDTO result = gameService.startGame(1L);
 
         assertNotNull(result);
-        assertEquals("___________", result.getPalabraOculta()); // 11 underscores para "PROGRAMADOR"
+        assertEquals("___________", result.getPalabraOculta());
         assertEquals(0, result.getLetrasIntentadas().size());
         assertEquals(7, result.getIntentosRestantes());
         assertFalse(result.getPalabraCompleta());
@@ -80,7 +80,6 @@ class GameServiceTest {
         verify(gameInProgressRepository, times(1)).save(any(GameInProgress.class));
         verify(playerRepository, times(1)).findById(1L);
         verify(wordRepository, times(1)).findRandomWord();
-
     }
 
     @Test
